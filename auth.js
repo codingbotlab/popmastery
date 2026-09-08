@@ -4,6 +4,14 @@ const POP = window.supabase && window.POPMASTERY_SUPABASE_URL && window.POPMASTE
 window.popSupabase = POP;
 window.popUser = null;
 
+window.popGoogleSignIn = async function() {
+  if (!POP) throw new Error('Supabase is not configured.');
+  return POP.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin }
+  });
+};
+
 window.popSaveResult = async function(game, result = {}) {
   if (!POP || !window.popUser) return;
   const row = {
@@ -19,19 +27,9 @@ window.popSaveResult = async function(game, result = {}) {
   };
   const { error } = await POP.from('game_results').insert(row);
   if (error) console.warn('Result save failed:', error.message);
-  await POP.from('activity_events').insert({
-    user_id: window.popUser.id,
-    event_type: 'game_completed',
-    game,
-    payload: result
-  });
+  await POP.from('activity_events').insert({ user_id: window.popUser.id, event_type: 'game_completed', game, payload: result });
   const { data: interest } = await POP.from('user_interests').select('score').eq('user_id', window.popUser.id).eq('interest', game).maybeSingle();
-  await POP.from('user_interests').upsert({
-    user_id: window.popUser.id,
-    interest: game,
-    score: (interest?.score || 0) + 1,
-    last_seen_at: new Date().toISOString()
-  }, { onConflict: 'user_id,interest' });
+  await POP.from('user_interests').upsert({ user_id: window.popUser.id, interest: game, score: (interest?.score || 0) + 1, last_seen_at: new Date().toISOString() }, { onConflict: 'user_id,interest' });
 };
 
 window.popGetProfile = async function() {
