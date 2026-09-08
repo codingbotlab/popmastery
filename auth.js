@@ -14,11 +14,13 @@ function installGoogleButton() {
   if (!form || document.getElementById('googleAuth')) return;
   const divider = document.createElement('div');
   divider.innerHTML = '<span>or</span>';
-  divider.style.cssText = 'display:flex;align-items:center;gap:10px;margin:16px 0;color:#7f879b;font-size:12px;';
-  divider.style.setProperty('justify-content','center');
+  divider.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:10px;margin:16px 0;color:#7f879b;font-size:12px;';
   const btn = document.createElement('button');
-  btn.id = 'googleAuth'; btn.type = 'button'; btn.textContent = 'G  Continue with Google';
-  btn.style.cssText = 'width:100%;padding:13px 16px;border-radius:12px;background:#fff;color:#111827;font-weight:800;display:flex;align-items:center;justify-content:center;gap:10px;border:1px solid #d9dce5;';
+  btn.id = 'googleAuth';
+  btn.type = 'button';
+  btn.setAttribute('aria-label', 'Continue with Google');
+  btn.innerHTML = '<span style="font-weight:900;font-size:17px;">G</span><span>Continue with Google</span>';
+  btn.style.cssText = 'width:100%;padding:13px 16px;border-radius:12px;background:#fff;color:#111827;font-weight:800;display:flex;align-items:center;justify-content:center;gap:10px;border:1px solid #d9dce5;cursor:pointer;';
   btn.addEventListener('click', async () => {
     const message = document.getElementById('authMessage');
     if (message) message.textContent = 'Connecting to Google…';
