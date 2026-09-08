@@ -6,7 +6,8 @@ window.popUser = null;
 
 window.popGoogleSignIn = async function() {
   if (!POP) throw new Error('Supabase is not configured.');
-  return POP.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
+  const redirectTo = 'https://popmastery.pages.dev/';
+  return POP.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } });
 };
 
 function installGoogleButton() {
