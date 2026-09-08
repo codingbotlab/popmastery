@@ -1,12 +1,15 @@
--- PopMastery Supabase schema
--- Run this once in Supabase SQL Editor.
+-- PopMastery: complete user/profile/activity schema
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text,
+  email text,
   avatar_url text,
+  provider text,
+  metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  last_login_at timestamptz
 );
 
 create table if not exists public.game_results (
@@ -40,6 +43,12 @@ create table if not exists public.user_interests (
   primary key (user_id, interest)
 );
 
+-- Safe upgrades for an already-created database.
+alter table public.profiles add column if not exists email text;
+alter table public.profiles add column if not exists provider text;
+alter table public.profiles add column if not exists metadata jsonb not null default '{}'::jsonb;
+alter table public.profiles add column if not exists last_login_at timestamptz;
+
 alter table public.profiles enable row level security;
 alter table public.game_results enable row level security;
 alter table public.activity_events enable row level security;
@@ -70,20 +79,29 @@ create policy "interests_select_own" on public.user_interests for select using (
 create policy "interests_insert_own" on public.user_interests for insert with check (auth.uid() = user_id);
 create policy "interests_update_own" on public.user_interests for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
--- Automatically create a profile for every new auth user.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer set search_path = public
 as $$
 begin
-  insert into public.profiles (id, display_name, avatar_url)
+  insert into public.profiles (id, display_name, email, avatar_url, provider, metadata, last_login_at)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data->>'display_name', split_part(coalesce(new.email, ''), '@', 1)),
-    new.raw_user_meta_data->>'avatar_url'
+    coalesce(new.raw_user_meta_data->>'display_name', new.raw_user_meta_data->>'full_name', split_part(coalesce(new.email, ''), '@', 1), 'Learner'),
+    new.email,
+    coalesce(new.raw_user_meta_data->>'avatar_url', new.raw_user_meta_data->>'picture'),
+    coalesce(new.raw_app_meta_data->>'provider', 'email'),
+    coalesce(new.raw_user_meta_data, '{}'::jsonb),
+    now()
   )
-  on conflict (id) do nothing;
+  on conflict (id) do update set
+    email = excluded.email,
+    avatar_url = coalesce(excluded.avatar_url, public.profiles.avatar_url),
+    provider = excluded.provider,
+    metadata = excluded.metadata,
+    updated_at = now(),
+    last_login_at = now();
   return new;
 end;
 $$;
@@ -93,6 +111,6 @@ create trigger on_auth_user_created
 after insert on auth.users
 for each row execute procedure public.handle_new_user();
 
--- Helpful indexes for profile/activity dashboards.
 create index if not exists game_results_user_played_idx on public.game_results(user_id, played_at desc);
 create index if not exists activity_events_user_created_idx on public.activity_events(user_id, created_at desc);
+create index if not exists user_interests_user_score_idx on public.user_interests(user_id, score desc);
