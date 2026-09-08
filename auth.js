@@ -6,10 +6,14 @@ window.popUser = null;
 
 window.popGoogleSignIn = async function() {
   if (!POP) throw new Error('Supabase is not configured.');
-  // Use the origin the user is currently on. This makes OAuth work on both
-  // local development (localhost) and the deployed Cloudflare Pages site.
-  const redirectTo = window.location.origin + window.location.pathname;
-  return POP.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } });
+  // Always finish Google OAuth on the deployed app. This also prevents a
+  // local-development URL from being used as the OAuth callback when the
+  // local server is not running after Google redirects back.
+  const redirectTo = 'https://popmastery.pages.dev/';
+  return POP.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo }
+  });
 };
 
 function installGoogleButton() {
