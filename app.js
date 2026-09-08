@@ -1,15 +1,249 @@
-const modal=document.getElementById('modal'),gameArea=document.getElementById('gameArea'),modalTitle=document.getElementById('modalTitle'),modalText=document.getElementById('modalText');
-const authModal=document.getElementById('authModal'),authForm=document.getElementById('authForm'),authTitle=document.getElementById('authTitle'),authText=document.getElementById('authText'),authSubmit=document.getElementById('authSubmit'),switchAuth=document.getElementById('switchAuth'),authMessage=document.getElementById('authMessage');let authMode='signup';
-const openModal=()=>{modal.classList.add('open');modal.setAttribute('aria-hidden','false')};const closeModal=()=>{modal.classList.remove('open');modal.setAttribute('aria-hidden','true');gameArea.innerHTML=''};document.getElementById('closeModal').onclick=closeModal;modal.addEventListener('click',e=>{if(e.target===modal)closeModal()});
-document.querySelectorAll('[data-game]').forEach(card=>card.addEventListener('click',()=>launch(card.dataset.game)));['heroPlay','ctaPlay'].forEach(id=>document.getElementById(id)?.addEventListener('click',()=>launch('typing')));document.getElementById('reactionBtn')?.addEventListener('click',()=>launch('focus'));document.getElementById('profileBtn')?.addEventListener('click',()=>window.popUser?openProfile():openAuth());document.getElementById('authBtn')?.addEventListener('click',()=>window.popUser?openProfile():openAuth());document.getElementById('closeProfile')?.addEventListener('click',closeProfile);document.getElementById('signOut')?.addEventListener('click',async()=>{await window.popSignOut?.();closeProfile()});switchAuth?.addEventListener('click',e=>{e.preventDefault();authMode=authMode==='signup'?'signin':'signup';renderAuth()});document.getElementById('googleAuth')?.addEventListener('click',async()=>{if(authMessage)authMessage.textContent='Connecting to Google…';try{const r=await window.popGoogleSignIn?.();if(r?.error)throw r.error}catch(err){if(authMessage)authMessage.textContent=err.message||'Google sign-in could not start.'}});document.getElementById('closeAuth')?.addEventListener('click',()=>{authModal?.classList.remove('open');authModal?.setAttribute('aria-hidden','true')});authModal?.addEventListener('click',e=>{if(e.target===authModal)document.getElementById('closeAuth')?.click()});authForm?.addEventListener('submit',handleAuth);
-function openAuth(){renderAuth();if(!window.popSupabase){if(authForm)authForm.style.display='none';if(switchAuth)switchAuth.style.display='none';const g=document.getElementById('googleAuth');if(g)g.style.display='none';if(authMessage)authMessage.textContent='Supabase is not connected yet. Add your Supabase URL and publishable/anon key to supabase-config.js.'}else{if(authForm)authForm.style.display='block';if(switchAuth)switchAuth.style.display='block';const g=document.getElementById('googleAuth');if(g)g.style.display='flex'}authModal?.classList.add('open');authModal?.setAttribute('aria-hidden','false')}
-function renderAuth(){const name=document.getElementById('authName');if(name)name.style.display=authMode==='signin'?'none':'block';if(authTitle)authTitle.textContent=authMode==='signin'?'Welcome back':'Save your progress';if(authText)authText.textContent=authMode==='signin'?'Sign in to continue your progress.':'Create a free account to keep every result and build your personal learning profile.';if(authSubmit)authSubmit.textContent=authMode==='signin'?'Sign in':'Create account';if(switchAuth)switchAuth.textContent=authMode==='signin'?'New here? Create a free account':'Already have an account? Sign in';if(authMessage&&window.popSupabase)authMessage.textContent=''}
-async function handleAuth(e){e.preventDefault();if(!window.popSupabase){if(authMessage)authMessage.textContent='Supabase is not connected yet. Add the project URL and publishable/anon key first.';return}if(authMessage)authMessage.textContent='Working…';const email=document.getElementById('authEmail').value.trim(),password=document.getElementById('authPassword').value,name=document.getElementById('authName')?.value.trim()||'';try{const r=authMode==='signin'?await window.popSignIn(email,password):await window.popSignUp(name,email,password);if(r.error){authMessage.textContent=r.error.message;return}if(authMode==='signup'&&!r.data.session)authMessage.textContent='Account created. Check your email to confirm, then sign in.';else{authMessage.textContent='Success!';setTimeout(()=>document.getElementById('closeAuth')?.click(),500)}}catch(err){if(authMessage)authMessage.textContent=err.message}}
-function openProfile(){loadProfile().then(()=>{document.getElementById('profileDrawer')?.classList.add('open');document.getElementById('profileDrawer')?.setAttribute('aria-hidden','false')})}function closeProfile(){document.getElementById('profileDrawer')?.classList.remove('open');document.getElementById('profileDrawer')?.setAttribute('aria-hidden','true')}
-function launch(type){openModal();if(type==='typing')typing();if(type==='memory')memory();if(type==='math')math();if(type==='focus')focus()}
-function typing(){modalTitle.textContent='Typing Rush';modalText.textContent='Pop the bubbles by typing their letters. Clear the board before they reach the top!';const letters='ASDFJKLQWERTYUIOPZXCVBNM';const bubbles=[];let score=0,misses=0,streak=0,started=performance.now(),running=true;gameArea.innerHTML=`<div class="typing-hud"><span>Score <b id="tScore">0</b></span><span>Streak <b id="tStreak">0</b> 🔥</span><span>Best <b id="tBest">0</b></span></div><div class="bubble-board" id="bubbleBoard"></div><div class="typing-input-row"><input class="type-input" id="typeInput" autocomplete="off" maxlength="1" placeholder="Type a letter…"><button class="card-btn" id="restartTyping">Restart</button></div><div class="type-result" id="typeResult">Speed: 0 WPM • Accuracy: 100%</div>`;const board=document.getElementById('bubbleBoard'),input=document.getElementById('typeInput'),result=document.getElementById('typeResult');let best=Number(localStorage.getItem('popmastery-typing-best')||0);document.getElementById('tBest').textContent=best;function update(){document.getElementById('tScore').textContent=score;document.getElementById('tStreak').textContent=streak;const elapsed=(performance.now()-started)/60000,wpm=Math.round((score/5)/Math.max(elapsed,1/60)),accuracy=Math.max(0,Math.round((score/Math.max(1,score+misses))*100));result.textContent=`Speed: ${wpm} WPM • Accuracy: ${accuracy}%`}function spawn(){if(!running)return;const b=document.createElement('button');b.className='type-bubble';b.textContent=letters[Math.floor(Math.random()*letters.length)];b.dataset.letter=b.textContent;b.style.left=(5+Math.random()*84)+'%';b.style.bottom='-55px';const duration=4200+Math.random()*2200;b.style.animationDuration=duration+'ms';board.appendChild(b);bubbles.push(b);setTimeout(()=>{if(!b.isConnected)return;b.remove();misses++;streak=0;update()},duration)}function hit(){const key=input.value.trim().toUpperCase();input.value='';if(!key)return;const match=bubbles.find(b=>b.isConnected&&b.dataset.letter===key);if(match){match.remove();score+=10+Math.min(streak,10)*2;streak++;if(score>best){best=score;localStorage.setItem('popmastery-typing-best',best);document.getElementById('tBest').textContent=best}update();if(window.popUser)window.popSaveResult('typing',{score,accuracy:Math.round((score/Math.max(1,score+misses))*100),wpm:Math.round((score/5)/Math.max((performance.now()-started)/60000,1/60))})}}input.oninput=hit;document.getElementById('restartTyping').onclick=()=>{bubbles.splice(0).forEach(b=>b.remove());score=0;misses=0;streak=0;started=performance.now();running=true;update();input.focus()};const timer=setInterval(()=>{if(!document.body.contains(board)){clearInterval(timer);running=false}},500);const spawner=setInterval(spawn,650);for(let i=0;i<4;i++)setTimeout(spawn,i*260);input.focus();update()}
-function memory(){modalTitle.textContent='Memory Flip';modalText.textContent='Find the matching pairs. Take your time — accuracy first.';const symbols=['◆','◆','●','●','▲','▲','★','★'];symbols.sort(()=>Math.random()-.5);gameArea.innerHTML='<div class="memory-grid">'+symbols.map((s,i)=>`<button class="memory-card" data-i="${i}" data-s="${s}">${s}</button>`).join('')+'</div><div class="type-result" id="memResult">0 pairs found</div>';let open=[],pairs=0,moves=0,locked=false;[...gameArea.querySelectorAll('.memory-card')].forEach(c=>c.onclick=()=>{if(locked||c.classList.contains('flipped'))return;c.classList.add('flipped');open.push(c);moves++;if(open.length===2){locked=true;if(open[0].dataset.s===open[1].dataset.s){pairs++;open=[];locked=false;document.getElementById('memResult').textContent=`${pairs}/4 pairs found`;if(pairs===4){const score=Math.max(100,500-moves*25);document.getElementById('memResult').textContent=`Perfect! ${score} points 🧠`;window.popSaveResult?.('memory',{score,accuracy:Math.round(8/moves*100),level:4,metadata:{moves}})}}else setTimeout(()=>{open.forEach(x=>x.classList.remove('flipped'));open=[];locked=false},550)}})}
-function math(){modalTitle.textContent='Math Sprint';modalText.textContent='Choose the correct answer. New question every round.';let score=0;newMath()}function newMath(){const a=Math.floor(Math.random()*20)+5,b=Math.floor(Math.random()*15)+2,ans=a+b;const options=[ans,ans+2,ans-3,ans+5].sort(()=>Math.random()-.5);gameArea.innerHTML=`<div class="math-q">${a} + ${b} = ?</div><div class="choices">${options.map(x=>`<button class="choice" data-a="${x}">${x}</button>`).join('')}</div><div class="type-result" id="mathResult">Get it right to continue.</div>`;gameArea.querySelectorAll('.choice').forEach(x=>x.onclick=()=>{const r=document.getElementById('mathResult');if(+x.dataset.a===ans){r.textContent='Correct! ⚡';window.popSaveResult?.('math',{score:1,level:score+1,metadata:{correct:true}});score++;setTimeout(newMath,450)}else r.textContent='Not quite — try again.'})}
-function focus(){modalTitle.textContent='Focus Hunt';modalText.textContent='Click the target as soon as it appears. Beat your reaction time.';gameArea.innerHTML='<div class="focus-board" id="focusBoard"></div><div class="focus-score" id="focusScore">Get ready…</div>';const board=document.getElementById('focusBoard'),score=document.getElementById('focusScore');function spawn(){board.innerHTML='<button class="focus-dot" aria-label="target"></button>';const dot=board.firstChild;dot.style.left=(Math.random()*84+6)+'%';dot.style.top=(Math.random()*78+8)+'%';const start=performance.now();dot.onclick=()=>{const ms=Math.round(performance.now()-start);score.textContent=`${ms} ms — ${ms<300?'Lightning fast! 🔥':'Nice! Try to beat it.'}`;window.popSaveResult?.('focus',{score:Math.max(1,1000-ms),reaction_ms:ms,metadata:{fast:ms<300}});setTimeout(spawn,650)}}setTimeout(spawn,700)}
-async function loadProfile(){const d=await window.popGetProfile?.();if(!d)return;const name=d.profile?.display_name||window.popUser?.user_metadata?.display_name||window.popUser?.email?.split('@')[0]||'Learner';document.getElementById('profileName').textContent=name;document.getElementById('profileEmail').textContent=window.popUser?.email||'—';document.getElementById('avatar').textContent=name[0].toUpperCase();document.getElementById('totalPlays').textContent=d.results.length;document.getElementById('bestScore').textContent=Math.round(Math.max(0,...d.results.map(r=>Number(r.score)||0)));document.getElementById('streak').textContent=new Set(d.results.map(r=>new Date(r.played_at).toISOString().slice(0,10))).size;document.getElementById('activityList').innerHTML=d.activities.length?d.activities.slice(0,10).map(e=>`<div class="activity-item"><b>${e.game||e.event_type}</b><span>${new Date(e.created_at).toLocaleString()}</span></div>`).join(''):'<p class="muted">No activity yet.</p>';document.getElementById('interestList').innerHTML=d.interests.length?d.interests.map(i=>`<span class="interest-pill">${i.interest} · ${i.score}</span>`).join(''):'<span class="muted">Play games to discover your interests.</span>'}
-function updateAuthUI(){const b=document.getElementById('authBtn');if(!b)return;b.textContent=window.popUser?(window.popUser.user_metadata?.display_name||window.popUser.email?.split('@')[0]||'Profile'):'Sign in'}window.addEventListener('pop-auth-ready',()=>{updateAuthUI();if(window.popUser)loadProfile()});updateAuthUI();
+/* PopMastery frontend — rebuilt with safe DOM startup and Supabase tracking. */
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const modal = $('modal'), gameArea = $('gameArea'), modalTitle = $('modalTitle'), modalText = $('modalText');
+  const authModal = $('authModal'), authForm = $('authForm');
+  let authMode = 'signup';
+
+  const show = (el, open) => {
+    if (!el) return;
+    el.classList.toggle('open', open);
+    el.setAttribute('aria-hidden', open ? 'false' : 'true');
+  };
+
+  function openModal() { show(modal, true); }
+  function closeModal() { show(modal, false); if (gameArea) gameArea.innerHTML = ''; }
+  function openAuth() { renderAuth(); show(authModal, true); $('authEmail')?.focus(); }
+  function closeAuth() { show(authModal, false); }
+  function openProfile() { loadProfile().then(() => show($('profileDrawer'), true)); }
+  function closeProfile() { show($('profileDrawer'), false); }
+
+  function renderAuth() {
+    const signin = authMode === 'signin';
+    if ($('authName')) $('authName').style.display = signin ? 'none' : 'block';
+    if ($('authTitle')) $('authTitle').textContent = signin ? 'Welcome back' : 'Save your progress';
+    if ($('authText')) $('authText').textContent = signin ? 'Sign in to continue your progress.' : 'Create a free account to keep every result and build your personal learning profile.';
+    if ($('authSubmit')) $('authSubmit').textContent = signin ? 'Sign in' : 'Create account';
+    if ($('switchAuth')) $('switchAuth').textContent = signin ? 'New here? Create a free account' : 'Already have an account? Sign in';
+    if ($('authMessage')) $('authMessage').textContent = '';
+  }
+
+  async function handleAuth(e) {
+    e.preventDefault();
+    if (!window.popSupabase) { $('authMessage').textContent = 'Supabase is not configured.'; return; }
+    const email = $('authEmail').value.trim();
+    const password = $('authPassword').value;
+    const name = $('authName')?.value.trim() || '';
+    $('authMessage').textContent = 'Working…';
+    try {
+      const response = authMode === 'signin'
+        ? await window.popSignIn(email, password)
+        : await window.popSignUp(name, email, password);
+      if (response?.error) throw response.error;
+      if (authMode === 'signup' && !response?.data?.session) {
+        $('authMessage').textContent = 'Account created. Check your email to confirm, then sign in.';
+      } else {
+        $('authMessage').textContent = 'Signed in successfully!';
+        setTimeout(closeAuth, 400);
+      }
+    } catch (err) {
+      $('authMessage').textContent = err?.message || 'Authentication failed.';
+    }
+  }
+
+  function updateAuthUI() {
+    const button = $('authBtn');
+    if (!button) return;
+    if (window.popUser) {
+      const name = window.popUser.user_metadata?.display_name || window.popUser.user_metadata?.full_name || window.popUser.user_metadata?.name || window.popUser.email?.split('@')[0] || 'Profile';
+      button.textContent = name;
+    } else button.textContent = 'Sign in';
+  }
+
+  async function logActivity(eventType, game = null, payload = {}) {
+    if (window.popSaveActivity) await window.popSaveActivity(eventType, game, payload);
+  }
+
+  async function saveResult(game, result) {
+    if (window.popSaveResult && window.popUser) {
+      await window.popSaveResult(game, result);
+      loadProfile();
+    }
+  }
+
+  function launch(type) {
+    if (!modal || !gameArea) return;
+    openModal();
+    logActivity('game_started', type, {});
+    ({ typing, memory, math, focus }[type] || typing)();
+  }
+
+  function typing() {
+    modalTitle.textContent = 'Typing Rush';
+    modalText.textContent = 'Type the sentence as quickly and accurately as you can.';
+    const target = 'Small steps every day create big skills.';
+    const start = performance.now();
+    gameArea.innerHTML = `<div class="type-text">${target}</div><input class="type-input" id="typeInput" autocomplete="off" placeholder="Start typing here…"><div class="type-result" id="typeResult">0 characters typed</div>`;
+    const input = $('typeInput'), result = $('typeResult');
+    input.focus();
+    let saved = false;
+    input.oninput = () => {
+      const value = input.value;
+      let correct = 0;
+      for (let i = 0; i < Math.min(value.length, target.length); i++) if (value[i] === target[i]) correct++;
+      const seconds = Math.max(0.1, (performance.now() - start) / 1000);
+      const minutes = seconds / 60;
+      const wpm = Math.round((correct / 5) / minutes);
+      const accuracy = value.length ? Math.round(correct / value.length * 100) : 0;
+      result.textContent = `${correct}/${target.length} correct • ${wpm} WPM • ${accuracy}% accuracy`;
+      if (value === target && !saved) {
+        saved = true;
+        saveResult('typing', { score: wpm, accuracy, wpm, duration_seconds: Math.round(seconds), metadata: { text_length: target.length } });
+        result.textContent = `Complete! ${wpm} WPM • ${accuracy}% accuracy 🎉`;
+      }
+    };
+  }
+
+  function memory() {
+    modalTitle.textContent = 'Memory Flip';
+    modalText.textContent = 'Find all matching pairs.';
+    const symbols = ['◆','◆','●','●','▲','▲','★','★'].sort(() => Math.random() - 0.5);
+    gameArea.innerHTML = `<div class="memory-grid">${symbols.map((s, i) => `<button class="memory-card" data-index="${i}" data-symbol="${s}">${s}</button>`).join('')}</div><div class="type-result" id="memResult">0/4 pairs found</div>`;
+    const cards = [...gameArea.querySelectorAll('.memory-card')];
+    const open = [];
+    let pairs = 0, moves = 0, locked = false, saved = false;
+    cards.forEach(card => card.onclick = () => {
+      if (locked || card.classList.contains('flipped')) return;
+      card.classList.add('flipped'); open.push(card); moves++;
+      if (open.length !== 2) return;
+      locked = true;
+      if (open[0].dataset.symbol === open[1].dataset.symbol) {
+        pairs++; open.length = 0; locked = false;
+        $('memResult').textContent = `${pairs}/4 pairs found`;
+        if (pairs === 4 && !saved) {
+          saved = true;
+          const score = Math.max(100, 500 - moves * 25);
+          const accuracy = Math.round(8 / moves * 100);
+          $('memResult').textContent = `Perfect! ${score} points 🧠`;
+          saveResult('memory', { score, accuracy, level: 4, metadata: { moves } });
+        }
+      } else setTimeout(() => { open.forEach(x => x.classList.remove('flipped')); open.length = 0; locked = false; }, 550);
+    });
+  }
+
+  function math() {
+    modalTitle.textContent = 'Math Sprint';
+    modalText.textContent = 'Choose the correct answer. Keep your streak going.';
+    let score = 0, questions = 0, saved = false;
+    const next = () => {
+      const a = Math.floor(Math.random() * 20) + 5;
+      const b = Math.floor(Math.random() * 15) + 2;
+      const answer = a + b;
+      const options = [...new Set([answer, answer + 2, answer - 3, answer + 5])].sort(() => Math.random() - 0.5);
+      gameArea.innerHTML = `<div class="math-q">${a} + ${b} = ?</div><div class="choices">${options.map(x => `<button class="choice" data-answer="${x}">${x}</button>`).join('')}</div><div class="type-result" id="mathResult">Score: ${score}</div>`;
+      gameArea.querySelectorAll('.choice').forEach(btn => btn.onclick = () => {
+        questions++;
+        const correct = Number(btn.dataset.answer) === answer;
+        $('mathResult').textContent = correct ? 'Correct! ⚡' : 'Not quite — try again.';
+        if (correct) {
+          score++;
+          saveResult('math', { score, level: score, metadata: { correct: true, question_number: questions } });
+          setTimeout(next, 450);
+        }
+      });
+    };
+    next();
+  }
+
+  function focus() {
+    modalTitle.textContent = 'Focus Hunt';
+    modalText.textContent = 'Click the target as soon as it appears. Beat your reaction time.';
+    gameArea.innerHTML = '<div class="focus-board" id="focusBoard"></div><div class="focus-score" id="focusScore">Get ready…</div>';
+    const board = $('focusBoard'), score = $('focusScore');
+    let stopped = false;
+    const spawn = () => {
+      if (stopped || !board.isConnected) return;
+      board.innerHTML = '<button class="focus-dot" aria-label="target"></button>';
+      const dot = board.firstElementChild;
+      dot.style.left = `${Math.random() * 84 + 6}%`;
+      dot.style.top = `${Math.random() * 78 + 8}%`;
+      const start = performance.now();
+      dot.onclick = () => {
+        const ms = Math.round(performance.now() - start);
+        score.textContent = `${ms} ms — ${ms < 300 ? 'Lightning fast! 🔥' : 'Nice! Try to beat it.'}`;
+        saveResult('focus', { score: Math.max(1, 1000 - ms), reaction_ms: ms, metadata: { fast: ms < 300 } });
+        setTimeout(spawn, 650);
+      };
+    };
+    setTimeout(spawn, 700);
+  }
+
+  async function loadProfile() {
+    if (!window.popUser || !window.popGetProfile) return;
+    const data = await window.popGetProfile();
+    if (!data) return;
+    const user = window.popUser;
+    const profile = data.profile || {};
+    const name = profile.display_name || user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Learner';
+    $('profileName').textContent = name;
+    $('profileEmail').textContent = profile.email || user.email || '—';
+    $('avatar').textContent = name.charAt(0).toUpperCase();
+    $('totalPlays').textContent = data.results.length;
+    $('bestScore').textContent = Math.round(Math.max(0, ...data.results.map(r => Number(r.score) || 0)));
+    $('streak').textContent = new Set(data.results.map(r => new Date(r.played_at).toISOString().slice(0, 10))).size;
+
+    const scores = { typing: 0, memory: 0, math: 0, focus: 0 };
+    data.results.forEach(r => {
+      if (r.game === 'typing') scores.typing = Math.max(scores.typing, Math.min(100, Number(r.accuracy) || 0));
+      if (r.game === 'memory') scores.memory = Math.max(scores.memory, Math.min(100, Number(r.accuracy) || 0));
+      if (r.game === 'math') scores.math = Math.max(scores.math, Math.min(100, (Number(r.score) || 0) * 10));
+      if (r.game === 'focus') scores.focus = Math.max(scores.focus, Math.min(100, (Number(r.score) || 0) / 10));
+    });
+    Object.entries(scores).forEach(([game, value]) => {
+      const bar = $(`${game}Bar`), text = $(`${game}Score`);
+      if (bar) bar.style.width = `${Math.round(value)}%`;
+      if (text) text.textContent = Math.round(value) || '—';
+    });
+    $('trend').textContent = `${data.results.length} recorded result${data.results.length === 1 ? '' : 's'} — keep playing to grow your skill map.`;
+    $('activityList').innerHTML = data.activities.length
+      ? data.activities.slice(0, 15).map(e => `<div class="activity-item"><b>${e.game || e.event_type}</b><span>${new Date(e.created_at).toLocaleString()}</span></div>`).join('')
+      : '<p class="muted">No activity yet.</p>';
+    $('interestList').innerHTML = data.interests.length
+      ? data.interests.map(i => `<span class="interest-pill">${i.interest} · ${i.score}</span>`).join('')
+      : '<span class="muted">Play games to discover your interests.</span>';
+  }
+
+  function bind() {
+    $('closeModal')?.addEventListener('click', closeModal);
+    modal?.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+    document.querySelectorAll('[data-game]').forEach(card => card.addEventListener('click', () => launch(card.dataset.game)));
+    $('heroPlay')?.addEventListener('click', () => launch('typing'));
+    $('ctaPlay')?.addEventListener('click', () => launch('typing'));
+    $('reactionBtn')?.addEventListener('click', () => launch('focus'));
+    $('profileBtn')?.addEventListener('click', () => window.popUser ? openProfile() : openAuth());
+    $('authBtn')?.addEventListener('click', () => window.popUser ? openProfile() : openAuth());
+    $('closeProfile')?.addEventListener('click', closeProfile);
+    $('closeAuth')?.addEventListener('click', closeAuth);
+    authModal?.addEventListener('click', e => { if (e.target === authModal) closeAuth(); });
+    $('signOut')?.addEventListener('click', async () => { await window.popSignOut?.(); closeProfile(); updateAuthUI(); });
+    $('switchAuth')?.addEventListener('click', e => { e.preventDefault(); authMode = authMode === 'signup' ? 'signin' : 'signup'; renderAuth(); });
+    $('googleAuth')?.addEventListener('click', async () => {
+      if (!window.popSupabase) { $('authMessage').textContent = 'Supabase is not configured.'; return; }
+      $('authMessage').textContent = 'Connecting to Google…';
+      try { await window.popGoogleSignIn(); } catch (err) { $('authMessage').textContent = err?.message || 'Google sign-in failed.'; }
+    });
+    authForm?.addEventListener('submit', handleAuth);
+  }
+
+  window.addEventListener('pop-auth-ready', () => {
+    updateAuthUI();
+    if (window.popUser) loadProfile();
+  });
+
+  document.addEventListener('DOMContentLoaded', () => {
+    bind();
+    updateAuthUI();
+    renderAuth();
+    if (window.popAuthInit) window.popAuthInit();
+  }, { once: true });
+})();
