@@ -16,9 +16,7 @@ function installGoogleButton() {
   divider.innerHTML = '<span>or</span>';
   divider.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:10px;margin:16px 0;color:#7f879b;font-size:12px;';
   const btn = document.createElement('button');
-  btn.id = 'googleAuth';
-  btn.type = 'button';
-  btn.setAttribute('aria-label', 'Continue with Google');
+  btn.id = 'googleAuth'; btn.type = 'button'; btn.setAttribute('aria-label', 'Continue with Google');
   btn.innerHTML = '<span style="font-weight:900;font-size:17px;">G</span><span>Continue with Google</span>';
   btn.style.cssText = 'width:100%;padding:13px 16px;border-radius:12px;background:#fff;color:#111827;font-weight:800;display:flex;align-items:center;justify-content:center;gap:10px;border:1px solid #d9dce5;cursor:pointer;';
   btn.addEventListener('click', async () => {
@@ -35,12 +33,23 @@ function installGoogleButton() {
   divider.insertAdjacentElement('afterend', btn);
 }
 
+function ensureProfile(user) {
+  if (!POP || !user) return;
+  const name = user.user_metadata?.display_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Learner';
+  const avatar = user.user_metadata?.avatar_url || user.user_metadata?.picture || null;
+  POP.from('profiles').upsert({ id: user.id, display_name: name, email: user.email || null, avatar_url: avatar, updated_at: new Date().toISOString() }, { onConflict: 'id' })
+    .then(({ error }) => { if (error) console.warn('Profile sync failed:', error.message); });
+  POP.from('activity_events').insert({ user_id: user.id, event_type: 'login', game: null, payload: { provider: user.app_metadata?.provider || 'email' } })
+    .then(({ error }) => { if (error) console.warn('Activity save failed:', error.message); });
+}
+
 window.popSaveResult = async function(game, result = {}) {
   if (!POP || !window.popUser) return;
   const row = { user_id: window.popUser.id, game, score: result.score ?? null, accuracy: result.accuracy ?? null, wpm: result.wpm ?? null, reaction_ms: result.reaction_ms ?? null, level: result.level ?? null, duration_seconds: result.duration_seconds ?? null, metadata: result.metadata || {} };
   const { error } = await POP.from('game_results').insert(row);
   if (error) console.warn('Result save failed:', error.message);
-  await POP.from('activity_events').insert({ user_id: window.popUser.id, event_type: 'game_completed', game, payload: result });
+  const { error: activityError } = await POP.from('activity_events').insert({ user_id: window.popUser.id, event_type: 'game_completed', game, payload: result });
+  if (activityError) console.warn('Activity save failed:', activityError.message);
   const { data: interest } = await POP.from('user_interests').select('score').eq('user_id', window.popUser.id).eq('interest', game).maybeSingle();
   await POP.from('user_interests').upsert({ user_id: window.popUser.id, interest: game, score: (interest?.score || 0) + 1, last_seen_at: new Date().toISOString() }, { onConflict: 'user_id,interest' });
 };
@@ -60,7 +69,7 @@ window.popSignIn = async function(email, password) { if (!POP) throw new Error('
 window.popSignOut = async function() { if (POP) return POP.auth.signOut(); };
 
 if (POP) {
-  POP.auth.getSession().then(({ data }) => { window.popUser = data.session?.user || null; installGoogleButton(); window.dispatchEvent(new Event('pop-auth-ready')); });
-  POP.auth.onAuthStateChange((_event, session) => { window.popUser = session?.user || null; installGoogleButton(); window.dispatchEvent(new Event('pop-auth-ready')); });
+  POP.auth.getSession().then(({ data }) => { window.popUser = data.session?.user || null; if (window.popUser) ensureProfile(window.popUser); installGoogleButton(); window.dispatchEvent(new Event('pop-auth-ready')); });
+  POP.auth.onAuthStateChange((_event, session) => { window.popUser = session?.user || null; if (window.popUser) ensureProfile(window.popUser); window.dispatchEvent(new Event('pop-auth-ready')); });
 }
 installGoogleButton();
